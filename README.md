@@ -1,24 +1,30 @@
-修正中、ベンチマークの結果、正の入力でペナルティ機能をして振る舞うほうが精度が向上することが判明しました、正負を反転したバージョンを公開します
-# ExP2 指数確率関数
+# ExP2 指数擬確率関数（Exponential Pseudo Probability Function）
 
 ### 概要
-`ExP2` 指数確率関数（ExPonential Probability Function）は、指数関数をベースにした活性化関数で、ニューラルネットワークのトレーニングに適した非線形性を提供します。この関数は、正の入力に対しては確率的な特性を反映し、負の入力に対しては損失関数として機能します。このような特性は、特に不均衡なデータや特異なデータポイントが存在する場合に有効です。
+`ExP2` 指数擬確率関数（Exponential Pseudo Probability Function）は、  条件付き確率と指数関数を元にした活性化関数です。
 
 ### 関数の定義
 
-ExP2関数は以下のように定義されます：
+実際のExP2関数は以下のように定義されます。
 
 - **\( x >=0 \)の場合：**
 ```math
-  f(x) = 1 - e^{-x}
+  f(x) = +(1 - e^-x) \cdot (1 + x)
 ```
-
+正の入力の場合
+この関数はxの符号を負に変更し、xに指数変換を行い1から引いた値に(1+x)を掛けた値を返します。  
+(1+x)は勾配消失を避けるために追加しています。
+  
 - **\( x <  0 \)の場合：**
 ```math
-
-  f(x) = -(1 - e^x) \cdot (1 - x)
+  f(x) = -(1 - e^{x})
 ```
-この定義により、関数は正の入力で確率的な特性を示し、負の入力でペナルティ機能として振る舞います。
+
+負の入力の場合、  
+この関数はxの負の符号を維持し、xを指数変換し1から引いた値を返します。  
+
+この定義により、  
+この関数は負の入力で確率的な特性をもち、正の入力でペナルティ機能として振る舞います。
 
 ### 導関数
 
@@ -26,15 +32,13 @@ ExP2関数の導関数は以下の通りです：
 
 - **\( x >= 0 \)の場合：**
 ```math
-  f'(x) = e^{-x}
+  f'(x) =  e^{-x}(x + 1) + 1 - e^{-x} 
 ```
 
 - **\( x <  0 \)の場合：**
 ```math
-  f'(x) = -x \cdot e^x + 1
+  f'(x) = e^{x}
 ```
-
-これらの導関数は、勾配降下法などの最適化アルゴリズムで使用する際に効率的な学習を促進します。
 
 ### PyTorchコード
 ```python
@@ -44,21 +48,22 @@ import torch.autograd as autograd
 class ExP2(autograd.Function):
     @staticmethod
     def forward(ctx, x):
+        # x>=0 (1-exp(-x))*(1+x)
+        # x< 0 -(1-exp(x))
         ctx.save_for_backward(x)
-        s = torch.sign(x)
-        exp_component = torch.exp(-torch.abs(x))
-        y = (1 - exp_component) * s * (torch.relu(-x) + 1)
-        return y
+        return (torch.sign(x) + torch.relu(x)) * (1 - torch.exp(-torch.abs(x)))
 
     @staticmethod
     def backward(ctx, grad_output):
+        # x>= (x + 1)*exp(-x) + 1 - exp(-x)
+        # x>=exp(x)
         x, = ctx.saved_tensors
-        s = torch.sign(x)
-        dx = torch.exp(-(x * s))
-        itr = -(s - (s * s)) *0.5
-        sc = ((1 - itr) + (itr * x) * -1)
-        dx = (dx * sc + itr)
-        grad_input = dx * grad_output
+        s  = torch.sign(x)
+        pn = torch.relu(s)
+        rx = torch.relu(x)
+        ax = torch.abs(x)
+        cp = torch.exp(-ax)
+        grad_input=((rx+1)*cp+(pn-cp)*pn)*grad_output
         return grad_input
 ```
 
