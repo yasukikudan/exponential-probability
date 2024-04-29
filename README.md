@@ -1,4 +1,4 @@
-# ExP2 指数擬確率関数（Exponential Pseudo Probability Function）
+# ExP2 指数擬確率関数
 
 ### 概要
 `ExP2` 指数擬確率関数（Exponential Pseudo Probability Function）は、  条件付き確率と指数関数を元にした活性化関数です。
